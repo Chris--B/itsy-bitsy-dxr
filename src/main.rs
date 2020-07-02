@@ -93,25 +93,6 @@ fn main() {
     let factory = check_hr!(d3d12::Factory4::create(d3d12::FactoryCreationFlags::DEBUG));
     let _debug = check_hr!(d3d12::Debug::get_interface());
 
-    // Select adapter
-    let adapter: d3d12::Adapter1 = if opts.warp {
-        println!("Using WARP adapter");
-
-        check_hr! {
-            unsafe {
-                use winapi::shared::dxgi::*;
-                use winapi::Interface;
-
-                let mut warp_adapter = d3d12::Adapter1::null();
-                let hr = factory.EnumWarpAdapter(&IDXGIAdapter1::uuidof(), warp_adapter.mut_void());
-
-                (warp_adapter, hr)
-            }
-        }
-    } else {
-        check_hr!(factory.enumerate_adapters(opts.adapter))
-    };
-
     // Log the adapters
     for i in 0.. {
         let (this_adapter, hr) = factory.enumerate_adapters(i);
@@ -129,13 +110,36 @@ fn main() {
             display_adapter(&this_adapter, &label);
         } else if hr == DXGI_ERROR_NOT_FOUND {
             // Not found - we're at the last one.
-            // Do not log this, it's expected
             break;
         } else {
             println!("Failed to enumerate adapter #{}: {}", i, hr_string(hr));
-            break;
+            return;
         }
     }
+
+    // Select adapter
+    let adapter: d3d12::Adapter1 = if opts.warp {
+        println!("Using WARP adapter");
+
+        check_hr! {
+            unsafe {
+                use winapi::shared::dxgi::*;
+                use winapi::Interface;
+
+                let mut warp_adapter = d3d12::Adapter1::null();
+                let hr = factory.EnumWarpAdapter(&IDXGIAdapter1::uuidof(), warp_adapter.mut_void());
+
+                (warp_adapter, hr)
+            }
+        }
+    } else {
+        let adapter = check_hr!(factory.enumerate_adapters(opts.adapter));
+        if adapter.is_null() {
+            return;
+        }
+
+        adapter
+    };
 
     let _device = check_hr!(d3d12::Device::create(adapter, opts.feature_level));
 
