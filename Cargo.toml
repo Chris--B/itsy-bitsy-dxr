@@ -1,0 +1,50 @@
+[package]
+name = "rt"
+version = "0.1.0"
+authors = ["Chris Butler <ChrisButler296@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = "0.4"
+structopt = "0.3"
+# pixwrapper = "0.1.1"
+raw-window-handle = "0.3"
+winit = "0.22"
+
+[dependencies.d3d12]
+version = "0.3"
+features = ["libloading"]
+
+[dependencies.winapi]
+version = "0.3"
+features = [
+    "basetsd",
+    "d3d12",
+    "d3d12sdklayers",
+    "d3d12shader",
+    "d3dcommon",
+    "d3dcompiler",
+    "dxgi1_2",
+    "dxgi1_3",
+    "dxgi1_4",
+    "dxgi1_6",
+    "dxgidebug",
+    "dxgiformat",
+    "dxgitype",
+    "handleapi",
+    "minwindef",
+    "synchapi",
+    "unknwnbase",
+    "winbase",
+    "windef",
+    "winerror",
+    "winnt",
+    "winuser"
+]
+
+# This forces docs.rs to build the crate on windows, otherwise the build fails
+# and we get no docs at all.
+[package.metadata.docs.rs]
+default-target = "x86_64-pc-windows-msvc"
