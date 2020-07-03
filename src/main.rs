@@ -17,6 +17,9 @@ use os_helpers::hr_string;
 
 use std::mem::zeroed;
 
+#[allow(non_upper_case_globals)]
+const MiB: usize = 1024 * 1024;
+
 fn parse_feature_level(text: &str) -> Result<d3d12::FeatureLevel, String> {
     let text = text.trim();
     match text {
@@ -57,7 +60,7 @@ struct Opts {
     )]
     feature_level: d3d12::FeatureLevel,
 
-    /// Number of frames to buffer. Double and triple buffering and normal
+    /// Number of frames to buffer. Double/triple buffering are normal.
     #[structopt(
         short,
         long,
@@ -80,8 +83,6 @@ fn display_adapter(adapter: &d3d12::Adapter1, label: &str) {
     let subsys_id = format!("0x{:x}", desc.SubSysId);
     let revision = format!("0x{:x}", desc.Revision);
 
-    #[allow(non_upper_case_globals)]
-    const MiB: usize = 1024 * 1024;
     let video_mem = desc.DedicatedVideoMemory / MiB;
     let system_mem = desc.DedicatedSystemMemory / MiB;
     let shared_mem = desc.SharedSystemMemory / MiB;
@@ -144,6 +145,29 @@ fn main() {
         if adapter.is_null() {
             return;
         }
+
+        adapter
+    };
+
+    let adapter = unsafe {
+        use winapi::shared::dxgi1_4::*;
+        use winapi::shared::dxgi1_6::*;
+        let adapter = check_hr!(adapter.cast::<IDXGIAdapter4>());
+
+        let mut mem_info: DXGI_QUERY_VIDEO_MEMORY_INFO = zeroed();
+        adapter.QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &mut mem_info);
+
+        let budget = mem_info.Budget / MiB as u64;
+        let current = mem_info.CurrentUsage / MiB as u64;
+        let reserved_avail = mem_info.AvailableForReservation / MiB as u64;
+        let reserved_current = mem_info.CurrentReservation / MiB as u64;
+
+        println!("DXGI_QUERY_VIDEO_MEMORY_INFO");
+        println!("    budget:           {:>5} MiB", budget);
+        println!("    current:          {:>5} MiB", current);
+        println!("    reserved_avail:   {:>5} MiB", reserved_avail);
+        println!("    reserved_current: {:>5} MiB", reserved_current);
+        println!();
 
         adapter
     };
