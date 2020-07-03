@@ -16,11 +16,12 @@ macro_rules! check_hr2 {
             // Log nothing, we're good :)
         } else {
             let location = format!("{}:{}", file!(), line!());
+            let call_site = format!("\n{}", stringify!($call)).replace("\n", "\n\t");
             println!(
-                "{location}: {call}:\n    {hr}",
+                "{location}: {hr}:\n{call}",
                 location = location,
                 hr = crate::os_helpers::hr_string(hr),
-                call = stringify!($call)
+                call = call_site
             );
         }
         (obj, hr)
@@ -55,5 +56,11 @@ pub fn hr_string(hr: d3d12::HRESULT) -> String {
         .trim_end_matches(char::from(0)) // Trailing NULs
         .trim_end() // Trailing whitespace (FormatMessage may add newlines)
         .len();
-    format!("{} (0x{:08X}) - {}", success_icon, hr, &full_msg[..str_len])
+    let msg = &full_msg[..str_len];
+
+    if msg.is_empty() {
+        format!("{} (0x{:08X})", success_icon, hr)
+    } else {
+        format!("{} (0x{:08X}) {}", success_icon, hr, msg)
+    }
 }

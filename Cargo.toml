@@ -41,7 +41,7 @@ features = [
     "windef",
     "winerror",
     "winnt",
-    "winuser"
+    "winuser",
 ]
 
 # This forces docs.rs to build the crate on windows, otherwise the build fails

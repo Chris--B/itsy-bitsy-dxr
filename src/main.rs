@@ -1,6 +1,9 @@
 use raw_window_handle::HasRawWindowHandle;
-use winapi::shared::dxgi::DXGI_ADAPTER_DESC;
+use winapi::shared::dxgi::*;
+use winapi::shared::dxgiformat::*;
+use winapi::shared::dxgitype::*;
 use winapi::shared::winerror::*;
+use winapi::Interface;
 
 use structopt::StructOpt;
 use winit::{
@@ -13,10 +16,6 @@ mod os_helpers;
 use os_helpers::hr_string;
 
 use std::mem::zeroed;
-
-const POSSIBLE_FEATURE_LEVELS: &[&str] = &[
-    "9_1", "9_2", "9_3", "10_0", "10_1", "11_0", "11_1", "12_0", "12_1",
-];
 
 fn parse_feature_level(text: &str) -> Result<d3d12::FeatureLevel, String> {
     let text = text.trim();
@@ -52,9 +51,20 @@ struct Opts {
         long,
         default_value = "11_0",
         parse(try_from_str = parse_feature_level),
-        possible_values=POSSIBLE_FEATURE_LEVELS
+        possible_values=&[
+            "9_1", "9_2", "9_3", "10_0", "10_1", "11_0", "11_1", "12_0", "12_1",
+        ]
     )]
     feature_level: d3d12::FeatureLevel,
+
+    /// Number of frames to buffer. Double and triple buffering and normal
+    #[structopt(
+        short,
+        long,
+        default_value = "3",
+        possible_values = &["1", "2", "3", "4", "5", "6", "7", "8"]
+    )]
+    buffer_count: u32,
 }
 
 fn display_adapter(adapter: &d3d12::Adapter1, label: &str) {
@@ -123,9 +133,6 @@ fn main() {
 
         check_hr! {
             unsafe {
-                use winapi::shared::dxgi::*;
-                use winapi::Interface;
-
                 let mut warp_adapter = d3d12::Adapter1::null();
                 let hr = factory.EnumWarpAdapter(&IDXGIAdapter1::uuidof(), warp_adapter.mut_void());
 
@@ -141,15 +148,46 @@ fn main() {
         adapter
     };
 
-    let _device = check_hr!(d3d12::Device::create(adapter, opts.feature_level));
+    let device = check_hr!(d3d12::Device::create(adapter, opts.feature_level));
 
+    let cmd_queue = check_hr!(device.create_command_queue(
+        d3d12::CmdListType::Direct,
+        d3d12::Priority::Normal,
+        d3d12::CommandQueueFlags::empty(),
+        0,
+    ));
+
+    // Initialize a window object to render onto
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .with_title("☀ Itsy Bitsy DXR ☀")
         .build(&event_loop)
         .expect("Failed to create a window");
 
-    let _h_wnd = window.raw_window_handle();
+    let hwnd: winapi::shared::windef::HWND = match window.raw_window_handle() {
+        raw_window_handle::RawWindowHandle::Windows(handle) => handle.hwnd as _,
+        raw_handle => panic!("Unsupported window handle + OS: {:?}", raw_handle),
+    };
+
+    let swapchain_desc = d3d12::SwapchainDesc {
+        buffer_count: opts.buffer_count,
+        buffer_usage: DXGI_USAGE_RENDER_TARGET_OUTPUT,
+        width: 1024,
+        height: 1024,
+        format: DXGI_FORMAT_R8G8B8A8_UNORM,
+        swap_effect: d3d12::SwapEffect::FlipDiscard,
+        sample: d3d12::SampleDesc {
+            count: 1,
+            ..unsafe { zeroed() }
+        },
+
+        ..unsafe { zeroed() }
+    };
+    let _swapchain = check_hr!(factory.as_factory2().create_swapchain_for_hwnd(
+        cmd_queue,
+        hwnd,
+        &swapchain_desc
+    ));
 
     event_loop.run(move |event, _, control_flow| {
         // *control_flow = ControlFlow::Wait;
